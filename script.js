@@ -1,4 +1,4 @@
-const API_BASE = window.API_BASE_URL || "http://localhost:3001";
+const API_BASE = window.API_BASE_URL || "http://192.168.2.230:3001";
 const TRACEROUTE_ENDPOINT = target =>
   `${API_BASE}/trace?target=${encodeURIComponent(target)}`;
 const PUBLIC_IP_ENDPOINT = `${API_BASE}/whoami`;
@@ -20,6 +20,11 @@ const input = document.getElementById("targetInput");
 const button = document.getElementById("showBtn");
 const hint = document.getElementById("hint");
 const clientInfo = document.getElementById("clientInfo");
+const apiTarget = document.getElementById("apiTarget");
+
+if (apiTarget) {
+  apiTarget.textContent = `Backend API: ${API_BASE}`;
+}
 
 button.addEventListener("click", () => {
   runTrace(input.value.trim() || "google.com");
@@ -45,7 +50,7 @@ function setHint(message) {
 
 async function runTrace(target) {
   setButtonState(true);
-  setHint(`Running traceroute via local API to "${target}"…`);
+  setHint(`Running traceroute via API (${API_BASE}) to "${target}"…`);
   clearRoute();
 
   try {
@@ -62,7 +67,7 @@ async function runTrace(target) {
     animatePacket(geoHops);
   } catch (err) {
     console.error(err);
-    setHint(err.message || "Could not complete traceroute. Is the backend running on port 3001?");
+    setHint(err.message || `Could not complete traceroute. Is the backend running at ${API_BASE}?`);
   } finally {
     setButtonState(false);
   }

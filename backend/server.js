@@ -10,6 +10,7 @@ const GEO_LOOKUP_URL = process.env.GEO_LOOKUP_URL || "https://ipwho.is";
 const MTR_BIN = process.env.MTR_BIN || "mtr";
 const TARGET_RE = /^[a-zA-Z0-9_.:-]+$/; // simple sanity check to avoid command injection
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 15000);
+const geoCache = new Map();
 
 const app = express();
 app.use(cors());
@@ -126,23 +127,52 @@ async function lookupPublicIP() {
 }
 
 async function geolocate(ip) {
-  try {
-    const res = await fetch(`${GEO_LOOKUP_URL}/${ip}`);
-    if (!res.ok) return null;
+  if (geoCache.has(ip)) return geoCache.get(ip);
 
-    const data = await res.json();
-    if (data.success === false) return null;
+  const providers = [
+    async () => {
+      const res = await fetch(`${GEO_LOOKUP_URL}/${ip}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.success === false) return null;
+      if (typeof data.latitude !== "number" || typeof data.longitude !== "number") return null;
+      return {
+        lat: data.latitude,
+        lon: data.longitude,
+        city: data.city,
+        country: data.country
+      };
+    },
+    async () => {
+      // Fallback: ipapi.co (rate-limited but useful as a backup)
+      const res = await fetch(`https://ipapi.co/${ip}/json/`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.error) return null;
+      if (typeof data.latitude !== "number" || typeof data.longitude !== "number") return null;
+      return {
+        lat: data.latitude,
+        lon: data.longitude,
+        city: data.city,
+        country: data.country_name || data.country
+      };
+    }
+  ];
 
-    return {
-      lat: data.latitude,
-      lon: data.longitude,
-      city: data.city,
-      country: data.country
-    };
-  } catch (err) {
-    console.warn(`Geolocation failed for ${ip}:`, err);
-    return null;
+  for (const provider of providers) {
+    try {
+      const geo = await provider();
+      if (geo) {
+        geoCache.set(ip, geo);
+        return geo;
+      }
+    } catch (err) {
+      console.warn(`Geolocation provider failed for ${ip}:`, err);
+    }
   }
+
+  geoCache.set(ip, null);
+  return null;
 }
 
 function isPrivateIP(ip) {
