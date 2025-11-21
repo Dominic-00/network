@@ -10,7 +10,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/network
+  IMAGE_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ toLower(github.repository_owner) }}/network
 
 jobs:
   build-and-push:
@@ -36,5 +37,5 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
