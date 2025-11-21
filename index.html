@@ -2,33 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Packet Path Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network Path Visualizer</title>
+  <meta name="description" content="Visualize network routes with live traceroute and geolocation" />
 
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
 </head>
 <body>
-  <header>
-    <h1>Trace real packets 🌍</h1>
-    <p>Type a domain or IP and watch a live traceroute plus the geolocation of each hop.</p>
-    <p id="clientInfo" class="client-info">Detecting your public IP and location…</p>
-    <p id="apiTarget" class="client-info"></p>
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <h1 class="title">Network Path Visualizer</h1>
+      <p class="subtitle">Trace packets across the globe with real-time geolocation</p>
+
+      <div class="info-bar">
+        <div id="clientInfo" class="info-item">
+          <span class="info-icon">📍</span>
+          <span class="info-text">Detecting your location...</span>
+        </div>
+        <div id="apiInfo" class="info-item">
+          <span class="info-icon">🔧</span>
+          <span class="info-text">API: Connecting...</span>
+        </div>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <div class="controls">
-      <input id="targetInput" type="text" placeholder="google.com" />
-      <button id="showBtn">Show route</button>
-      <span id="hint"></span>
-    </div>
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- Controls -->
+      <div class="controls-panel">
+        <div class="input-group">
+          <label for="targetInput" class="visually-hidden">Target domain or IP</label>
+          <input
+            id="targetInput"
+            type="text"
+            class="target-input"
+            placeholder="Enter domain or IP (e.g., google.com)"
+            autocomplete="off"
+          />
+          <button id="traceBtn" class="trace-btn">
+            <span class="btn-text">Trace Route</span>
+          </button>
+        </div>
 
-    <div id="map"></div>
+        <div id="statusMessage" class="status-message"></div>
+      </div>
+
+      <!-- Map Container -->
+      <div id="mapContainer" class="map-container">
+        <div id="map" class="map"></div>
+
+        <!-- Stats Overlay -->
+        <div id="statsPanel" class="stats-panel" style="display: none;">
+          <h3 class="stats-title">Route Statistics</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">Total Hops</span>
+              <span id="statTotalHops" class="stat-value">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Public IPs</span>
+              <span id="statPublicHops" class="stat-value">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Geolocated</span>
+              <span id="statGeoHops" class="stat-value">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Duration</span>
+              <span id="statDuration" class="stat-value">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Tracing network path...</div>
+      <div class="loading-subtext">This may take a few seconds</div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Custom JS -->
   <script src="script.js"></script>
 </body>
 </html>
