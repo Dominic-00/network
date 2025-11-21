@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Packet Path Map</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+</head>
+<body>
+  <header>
+    <h1>Trace real packets 🌍</h1>
+    <p>Type a domain or IP and watch a live traceroute plus the geolocation of each hop.</p>
+    <p id="clientInfo" class="client-info">Detecting your public IP and location…</p>
+  </header>
+
+  <main>
+    <div class="controls">
+      <input id="targetInput" type="text" placeholder="google.com" />
+      <button id="showBtn">Show route</button>
+      <span id="hint"></span>
+    </div>
+
+    <div id="map"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
