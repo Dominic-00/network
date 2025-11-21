@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    # Required for traceroute/mtr to work properly
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Optional: Use host network for full network visibility
+    # Uncomment the next line if you still have issues with private IPs
+    # network_mode: host
+    restart: unless-stopped

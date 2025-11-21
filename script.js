@@ -54,15 +54,23 @@ async function runTrace(target) {
   clearRoute();
 
   try {
-    const hops = await fetchTraceroute(target);
+    const response = await fetchTraceroute(target);
+    const hops = response.hops || [];
     const geoHops = hops.filter(h => typeof h.lat === "number" && typeof h.lon === "number");
 
+    console.log(`Received ${hops.length} total hops, ${geoHops.length} with geo data (${response.publicCount || 0} public IPs)`);
+    hops.forEach(h => console.log(`  Hop ${h.hop}: ${h.ip} ${h.hostname || ''} ${h.lat ? `[${h.lat},${h.lon}]` : '[no geo]'}`));
+
     if (!geoHops.length) {
-      setHint("Traceroute ran, but no hops came back with public IP locations (likely all private hops).");
+      const privateCount = hops.filter(h => h.ip && !h.lat).length;
+      const message = `Traceroute found ${hops.length} hop(s) but none with public IP geolocation. ` +
+                     `This usually means the path only contains private/internal network hops. ` +
+                     `Check server logs for details.`;
+      setHint(message);
       return;
     }
 
-    setHint(`Traceroute from your Docker API (server-side mtr + geolocation). Target "${target}".`);
+    setHint(`Traceroute from your Docker API (server-side mtr + geolocation). Target "${target}". Showing ${geoHops.length} of ${hops.length} hops.`);
     drawRoute(geoHops);
     animatePacket(geoHops);
   } catch (err) {
@@ -85,10 +93,13 @@ async function fetchTraceroute(target) {
     throw new Error("Response missing hop list.");
   }
 
-  return data.hops.map((hop, idx) => ({
-    ...hop,
-    label: hop.hostname || hop.ip || `hop-${idx + 1}`
-  }));
+  return {
+    ...data,
+    hops: data.hops.map((hop, idx) => ({
+      ...hop,
+      label: hop.hostname || hop.ip || `hop-${idx + 1}`
+    }))
+  };
 }
 
 async function fetchAndPinClient() {

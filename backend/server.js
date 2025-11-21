@@ -18,6 +18,45 @@ app.use(express.json());
 
 app.get("/healthz", (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
+app.get("/diag", async (_req, res) => {
+  try {
+    // Quick diagnostic to test if we can reach public internet and run mtr
+    const testTarget = "8.8.8.8";
+    const cmd = `${MTR_BIN} --report --report-wide -c 1 --json ${testTarget}`;
+    const { stdout } = await execAsync(cmd, { timeout: 10000 });
+
+    let hops = [];
+    try {
+      const json = JSON.parse(stdout);
+      hops = parseMtrJson(json);
+    } catch {
+      hops = parseMtrText(stdout);
+    }
+
+    const publicHops = hops.filter(h => h.ip && !isPrivateIP(h.ip));
+
+    res.json({
+      status: "ok",
+      mtrPath: MTR_BIN,
+      testTarget,
+      totalHops: hops.length,
+      publicHops: publicHops.length,
+      hops: hops.map(h => ({
+        hop: h.hop,
+        ip: h.ip,
+        hostname: h.hostname,
+        isPrivate: h.ip ? isPrivateIP(h.ip) : null
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      error: err.message,
+      mtrPath: MTR_BIN
+    });
+  }
+});
+
 app.get("/trace", async (req, res) => {
   const target = (req.query.target || "").trim();
   if (!target || !TARGET_RE.test(target)) {
@@ -26,10 +65,16 @@ app.get("/trace", async (req, res) => {
 
   try {
     const hops = await runTraceroute(target);
+    console.log(`Traceroute to ${target} returned ${hops.length} hops`);
+    hops.forEach(h => console.log(`  Hop ${h.hop}: ${h.ip} (${h.hostname}) - ${isPrivateIP(h.ip || '') ? 'PRIVATE' : 'PUBLIC'}`));
+
     const enriched = await enrichWithGeo(hops);
+    const publicHops = enriched.filter(h => h.ip && !isPrivateIP(h.ip));
+
     res.json({
       target,
       count: enriched.length,
+      publicCount: publicHops.length,
       hops: enriched,
       source: "local mtr inside Docker",
       geolocator: "ipwho.is"
@@ -58,14 +103,18 @@ app.listen(PORT, () => {
 });
 
 async function runTraceroute(target) {
-  const cmd = `${MTR_BIN} --report --report-wide -c 1 --json ${target}`;
-  const { stdout } = await execAsync(cmd, { timeout: REQUEST_TIMEOUT_MS });
+  const cmd = `${MTR_BIN} --report --report-wide -c 3 --json ${target}`;
+  console.log(`Running: ${cmd}`);
+  const { stdout, stderr } = await execAsync(cmd, { timeout: REQUEST_TIMEOUT_MS });
+
+  if (stderr) console.warn('mtr stderr:', stderr);
 
   // Prefer JSON output; fall back to parsing text if needed
   try {
     const json = JSON.parse(stdout);
     return parseMtrJson(json);
-  } catch {
+  } catch (e) {
+    console.warn('Failed to parse mtr JSON, falling back to text parsing:', e.message);
     return parseMtrText(stdout);
   }
 }
@@ -73,12 +122,20 @@ async function runTraceroute(target) {
 function parseMtrJson(json) {
   if (!json || !json.report || !Array.isArray(json.report.hubs)) return [];
 
-  return json.report.hubs.map((hub, idx) => ({
-    hop: idx + 1,
-    ip: hub.ip || null,
-    hostname: hub.host || hub.hostname || hub.ip || null,
-    rtt: firstNumber(hub.avg, hub.last, hub.best, hub.wst)
-  }));
+  return json.report.hubs.map((hub, idx) => {
+    // Extract host string (could be IP or hostname)
+    const hostString = hub.host || hub.hostname || hub.ip || null;
+
+    // Check if hostString is an IP address (simple IPv4 check)
+    const isIP = hostString && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostString);
+
+    return {
+      hop: idx + 1,
+      ip: isIP ? hostString : (hub.ip || null),
+      hostname: hostString,
+      rtt: firstNumber(hub.avg, hub.last, hub.best, hub.wst)
+    };
+  });
 }
 
 function parseMtrText(text) {
