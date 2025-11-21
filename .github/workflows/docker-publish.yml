@@ -3,9 +3,19 @@ name: Build and Push to GHCR
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ secrets.GHCR_USERNAME != '' && toLower(secrets.GHCR_USERNAME) || toLower(github.repository_owner) }}
+  IMAGE_NAME: network
 
 jobs:
-  build-andpush:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -18,25 +28,30 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ env.IMAGE_OWNER }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Write .env file
-        if: ${{ secrets.DOTENV_FILE != '' }}
-        run: echo "${{ secrets.DOTENV_FILE }}" > .env
+          
+      - name: Write .env file (for build args)
+        if: ${{ secrets.DOTENV_FILE && secrets.DOTENV_FILE != '' }}
+        working-directory: backend
+        env:
+          DOTENV_FILE: ${{ secrets.DOTENV_FILE }}
+        run: |
+          printf "%s" "$DOTENV_FILE" > .env
 
       - name: Generate image tag
         id: vars
-        run: echo "tag=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
+        run: echo "tag=$(date +'%Y%m%d%H%M')" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./backend
+          file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ secrets.GHCR_USERNAME }}/hello-world:latest
-            ghcr.io/${{ secrets.GHCR_USERNAME }}/hello-world:${{ steps.vars.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
